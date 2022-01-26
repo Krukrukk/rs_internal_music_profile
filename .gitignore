@@ -1,8 +1,10 @@
 # userdefined 
-BertTokenizer
-BertModel
+BertTokenizer/
+BertModel/
 torch_logs/
 tensorboard_logs
+embeddings/
+data/embedds/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -134,4 +136,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/data
