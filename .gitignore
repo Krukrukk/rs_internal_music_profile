@@ -10,7 +10,6 @@ __pycache__/
 *$py.class
 
 client_keys/
-data/
 # C extensions
 *.so
 
