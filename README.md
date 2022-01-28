@@ -8,8 +8,6 @@ Images:
 - docker pull pszelew/spot-sysrec-backend:latest
 - docker pull pszelew/spot-sysrec-frontend:latest
 
-
-
 **Authors**
 - [Mateusz Czyż](https://github.com/CzyzuM/)<br>
 - [Maciej Małecki](https://github.com/Krukrukk)<br>
