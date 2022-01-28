@@ -1,0 +1,21 @@
+version: "3"
+services:
+  main-server:
+    privileged: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - 8080:8080
+  streamlit-app:
+    build:
+      context: ./spot_recsys_frontend
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - ./spot_recsys_frontend/.env
+    ports:
+      - 5000:80

@@ -1,10 +1,12 @@
 # userdefined 
-BertTokenizer/
-BertModel/
+embeddings/pretrained/BertTokenizer/
+embeddings/pretrained/BertModel/
 torch_logs/
-tensorboard_logs
+tensorboard_logs/
 embeddings/
 data/embedds/
+deploy.yml
+data/all_in_one_playlist_dataset.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

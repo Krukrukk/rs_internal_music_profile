@@ -1,0 +1,59 @@
+### How to config azure service
+
+az group create --name SysRec --location eastus
+
+az network vnet create \
+    --name myVNet \
+    --resource-group SysRec \
+    --location eastus \
+    --address-prefix 10.0.0.0/16 \
+    --subnet-name myAGSubnet \
+    --subnet-prefix 10.0.1.0/24
+
+az network vnet subnet create \
+    --name myACISubnet \
+    --resource-group SysRec \
+    --vnet-name myVNet   \
+    --address-prefix 10.0.2.0/24
+
+az network public-ip create \
+    --resource-group SysRec\
+    --name myAGPublicIPAddress \
+    --allocation-method Static \
+    --sku Standard
+
+
+az network vnet subnet update \
+    --resource-group SysRec \
+    --name myACISubnet \
+    --vnet-name myVnet \
+    --delegations 'Microsoft.ContainerInstance/containerGroups'
+
+
+az container create --resource-group SysRec --name recsys -f deploy.yml
+
+
+ACI_IP=$(az container show \
+    --name recsys \
+    --resource-group SysRec \
+    --query ipAddress.ip --output tsv)
+
+
+
+az network application-gateway create \
+    --name myAppGateway \
+    --location eastus \
+    --resource-group SysRec \
+    --capacity 2 \
+    --sku Standard_v2 \
+    --http-settings-protocol http \
+    --public-ip-address myAGPublicIPAddress \
+    --vnet-name myVNet \
+    --subnet myAGSubnet \
+    --servers "$ACI_IP"
+
+az network public-ip show \
+    --resource-group SysRec \
+    --name myAGPublicIPAddress \
+    --query [ipAddress] \
+    --output tsv

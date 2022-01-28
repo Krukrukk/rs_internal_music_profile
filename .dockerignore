@@ -1,0 +1,8 @@
+embeddings/pretrained/BertTokenizer/
+embeddings/pretrained/BertModel/
+torch_logs/
+tensorboard_logs/
+data/embedds/
+data/all_in_one_playlist_dataset.json
+deploy.yml
+*.ipynb

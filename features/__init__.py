@@ -75,16 +75,17 @@ class FeatureProcessor:
 
     def _preprocess_numeric_features(self, df: pd.DataFrame) -> None:
         """
-        Preprocesses numeric using given config. Everything is done inplace
+                Preprocesses numeric using given config. Everything is done inplaceRUN python -m nltk.downloader stopwords
+        RUN python -m nltk.downloader wordnet
+        RUN python -m nltk.downloader omw-1.4
 
-        Params
-        --------------------------
-        df : pd.DataFrame
-            DataFrame with songs data to be preprocessed
+                --------------------------
+                df : pd.DataFrame
+                    DataFrame with songs data to be preprocessed
 
-        Returns
-        ------------------------
-        None
+                Returns
+                ------------------------
+                None
         """
         # Process numeric features
         for key in self.numeric_features:

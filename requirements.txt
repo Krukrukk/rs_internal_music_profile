@@ -6,3 +6,5 @@ pydantic~=1.9.0
 uvicorn~=0.16.0
 transformers~=4.15.0
 torch~=1.10.1
+fastapi_sessions~=0.3.2
+scikit-learn~=1.0.2
