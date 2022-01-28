@@ -1,3 +1,4 @@
+from http.client import ImproperConnectionState
 import imp
 import json
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ import torch
 from transformers import BertTokenizer, BertModel
 
 from features import FeatureProcessor
+from recommender import Recommender
 from embeddings import Embedder
 from logger import get_logger
 
@@ -20,26 +22,16 @@ logger = get_logger(__name__)
 class SpotifyManager(FeatureProcessor, Embedder):
     def __init__(
         self,
-        spotify_client_id: str,
-        spotify_client_secret: str,
-        spotify_redirect_uri: str,
         scope: str,
         model: BertModel,
         tokenizer: BertTokenizer,
+        recommender: Recommender,
         embedder_kwargs: dict = {},
     ) -> None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         FeatureProcessor.__init__(self, model, tokenizer, device)
         Embedder.__init__(self, device, embedder_kwargs)
-        self.scope = scope
-        self.client = Spotify(
-            auth_manager=SpotifyOAuth(
-                client_id=spotify_client_id,
-                client_secret=spotify_client_secret,
-                redirect_uri=spotify_redirect_uri,
-                scope=scope,
-            )
-        )
+        self.recommender = recommender
 
     @staticmethod
     def _preprocess_history_songs(songs: dict) -> list:
@@ -92,15 +84,21 @@ class SpotifyManager(FeatureProcessor, Embedder):
     # User playling logs
     # ----------------------------------------------------------------
 
-    def get_current_song(self) -> dict:
-        response = self.client.currently_playing()
-        return self._preprocess_current_song(response)
+    def get_current_song(self, token: str) -> dict:
+        client = Spotify(auth=token)
+        response = client.currently_playing()
 
-    def get_history_songs(self, n: int) -> list[dict]:
-        response = self.client.current_user_recently_played(limit=n)
+        if response:
+            return self._preprocess_current_song(response)
+        else:
+            return None
+
+    def get_history_songs(self, token, n: int) -> list[dict]:
+        client = Spotify(auth=token)
+        response = client.current_user_recently_played(limit=n)
         return self._preprocess_history_songs(response)
 
-    def get_session(self, n: int = 50, margin: int = 300) -> list[dict]:
+    def get_session(self, token, n: int = 50, margin: int = 300) -> list[dict]:
         """
         This method returns user listening session based on listening time
 
@@ -109,8 +107,8 @@ class SpotifyManager(FeatureProcessor, Embedder):
         margin : int = 300
             Maximum pause in songs treat them as a session in seconds
         """
-        current_song = self.get_current_song()
-        history_songs = self.get_history_songs(n)
+        current_song = self.get_current_song(token)
+        history_songs = self.get_history_songs(token, n)
         session_songs = [current_song]
 
         for song in history_songs:
@@ -125,15 +123,16 @@ class SpotifyManager(FeatureProcessor, Embedder):
     # Tracks data
     # ----------------------------------------------------------------
 
-    def get_data_song_raw(self, track_uri: str) -> dict:
+    def get_data_song_raw(self, token: str, track_uri: str) -> dict:
         """
         Fetches song sumeric, text and sequence features by giving it's track_uri
 
         track_uri : str
         """
-        features = self.client.audio_features(track_uri)[0]
-        general_data = self.client.track(track_uri)
-        sections = self.client.audio_analysis(track_uri)["sections"]
+        client = Spotify(auth=token)
+        features = client.audio_features(track_uri)[0]
+        general_data = client.track(track_uri)
+        sections = client.audio_analysis(track_uri)["sections"]
 
         album_name = general_data["album"]["name"]
         track_name = general_data["name"]
@@ -146,19 +145,47 @@ class SpotifyManager(FeatureProcessor, Embedder):
         features["analysis_sections"] = sections
         return features
 
-    def get_data_songs_preprocessed(self, tracks_uris: list[str], to_dict=True) -> dict:
-        data_raw = [self.get_data_song_raw(track_uri) for track_uri in tracks_uris]
+    def get_data_songs_preprocessed(
+        self, token: str, tracks_uris: list[str], to_dict=True
+    ) -> dict:
+        data_raw = [
+            self.get_data_song_raw(token, track_uri) for track_uri in tracks_uris
+        ]
         df = pd.DataFrame(data_raw)
         self.preprocess_features(df)
         if to_dict:
             return df.to_dict("records")
         return df
 
-    def generate_songs_embeddings(self, tracks_uris: list[str]):
-        df = self.get_data_songs_preprocessed(tracks_uris, False)
+    def generate_songs_embeddings(self, token, tracks_uris: list[str]):
+        df = self.get_data_songs_preprocessed(token, tracks_uris, False)
         numeric_features = torch.tensor(df[list(self.numeric_features.keys())].values)
         text_features = torch.stack(list(df["text_embeddings"]))
         seq_features = torch.stack(list(df[f"{self.section_feature['name']}_seq"]))
 
         embedding = self.get_embedding(numeric_features, text_features, seq_features)
         return embedding
+
+    # ----------------------------------------------------------------
+    # Recommender
+    # ----------------------------------------------------------------
+
+    def get_recommendations(
+        self, token: str, n: int = 10, hist: int = 20, _type: str = "hist"
+    ):
+        """
+        _type : str
+            Possible values: _hist / session
+        """
+        if _type == "hist":
+            history = self.get_history_songs(token, hist)
+
+        else:
+            history = self.get_session(token, n)
+
+        history_embeddings = self.generate_songs_embeddings(
+            token, map(lambda song: song["uri"], history)
+        )
+
+        recommendations = self.recommender.get_recommendations(history_embeddings, n)
+        return recommendations
